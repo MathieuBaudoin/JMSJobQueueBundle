@@ -16,36 +16,41 @@
  * limitations under the License.
  */
 
-namespace JMS\JobQueueBundle\Entity\Repository;
+namespace Entity\Repository;
 
+use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Proxy\Proxy;
 use Doctrine\Common\Util\ClassUtils;
-use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Types\Type;
-use Doctrine\ORM\EntityManager;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\Exception;
+use Doctrine\ORM\Exception\ORMException;
+use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\Query\Parameter;
 use Doctrine\ORM\Query\ResultSetMappingBuilder;
-use JMS\JobQueueBundle\Entity\Job;
-use JMS\JobQueueBundle\Event\StateChangeEvent;
-use JMS\JobQueueBundle\Retry\ExponentialRetryScheduler;
-use JMS\JobQueueBundle\Retry\RetryScheduler;
+use Doctrine\Persistence\ObjectManager;
+use InvalidArgumentException;
+use Entity\Job;
+use Event\StateChangeEvent;
+use Retry\ExponentialRetryScheduler;
+use Retry\RetryScheduler;
+use LogicException;
+use RuntimeException;
 use Symfony\Bridge\Doctrine\ManagerRegistry;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class JobManager
 {
-    private $dispatcher;
-    private $registry;
-    private $retryScheduler;
-    
-    public function __construct(ManagerRegistry $managerRegistry, EventDispatcherInterface $eventDispatcher, RetryScheduler $retryScheduler)
-    {
-        $this->registry = $managerRegistry;
-        $this->dispatcher = $eventDispatcher;
-        $this->retryScheduler = $retryScheduler;
-    }
+    public function __construct(private readonly ManagerRegistry $managerRegistry,
+                                private readonly EventDispatcherInterface $eventDispatcher,
+                                private RetryScheduler $retryScheduler) {}
 
-    public function findJob($command, array $args = array())
+    /**
+     * @param $command
+     * @param array $args
+     * @return mixed
+     */
+    public function findJob($command, array $args = []): mixed
     {
         return $this->getJobManager()->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args")
             ->setParameter('command', $command)
@@ -54,16 +59,28 @@ class JobManager
             ->getOneOrNullResult();
     }
 
-    public function getJob($command, array $args = array())
+    /**
+     * @param $command
+     * @param array $args
+     * @return mixed
+     */
+    public function getJob($command, array $args = []): mixed
     {
         if (null !== $job = $this->findJob($command, $args)) {
             return $job;
         }
 
-        throw new \RuntimeException(sprintf('Found no job for command "%s" with args "%s".', $command, json_encode($args)));
+        throw new RuntimeException(sprintf('Found no job for command "%s" with args "%s".', $command, json_encode($args)));
     }
 
-    public function getOrCreateIfNotExists($command, array $args = array())
+    /**
+     * @param $command
+     * @param array $args
+     * @return Job|mixed
+     * @throws ORMException
+     * @throws OptimisticLockException
+     */
+    public function getOrCreateIfNotExists($command, array $args = []): mixed
     {
         if (null !== $job = $this->findJob($command, $args)) {
             return $job;
@@ -71,7 +88,7 @@ class JobManager
 
         $job = new Job($command, $args, false);
         $this->getJobManager()->persist($job);
-        $this->getJobManager()->flush($job);
+        $this->getJobManager()->flush();
 
         $firstJob = $this->getJobManager()->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args ORDER BY j.id ASC")
              ->setParameter('command', $command)
@@ -82,18 +99,26 @@ class JobManager
         if ($firstJob === $job) {
             $job->setState(Job::STATE_PENDING);
             $this->getJobManager()->persist($job);
-            $this->getJobManager()->flush($job);
+            $this->getJobManager()->flush();
 
             return $job;
         }
 
         $this->getJobManager()->remove($job);
-        $this->getJobManager()->flush($job);
+        $this->getJobManager()->flush();
 
         return $firstJob;
     }
 
-    public function findStartableJob($workerName, array &$excludedIds = array(), $excludedQueues = array(), $restrictedQueues = array())
+    /**
+     * @param $workerName
+     * @param array $excludedIds
+     * @param array $excludedQueues
+     * @param array $restrictedQueues
+     * @return mixed|null
+     * @throws Exception
+     */
+    public function findStartableJob($workerName, array &$excludedIds = [], array $excludedQueues = [], array $restrictedQueues = []): mixed
     {
         while (null !== $job = $this->findPendingJob($excludedIds, $excludedQueues, $restrictedQueues)) {
             if ($job->isStartable() && $this->acquireLock($workerName, $job)) {
@@ -111,14 +136,20 @@ class JobManager
         return null;
     }
 
-    private function acquireLock($workerName, Job $job)
+    /**
+     * @param $workerName
+     * @param Job $job
+     * @return bool
+     * @throws Exception
+     */
+    private function acquireLock($workerName, Job $job): bool
     {
-        $affectedRows = $this->getJobManager()->getConnection()->executeUpdate(
+        $affectedRows = $this->getJobManager()->getConnection()->executeStatement(
             "UPDATE jms_jobs SET workerName = :worker WHERE id = :id AND workerName IS NULL",
-            array(
+            [
                 'worker' => $workerName,
-                'id' => $job->getId(),
-            )
+                'id' => $job->getId()
+            ]
         );
 
         if ($affectedRows > 0) {
@@ -130,12 +161,16 @@ class JobManager
         return false;
     }
 
-    public function findAllForRelatedEntity($relatedEntity)
+    /**
+     * @param $relatedEntity
+     * @return mixed
+     */
+    public function findAllForRelatedEntity($relatedEntity): mixed
     {
         list($relClass, $relId) = $this->getRelatedEntityIdentifier($relatedEntity);
 
         $rsm = new ResultSetMappingBuilder($this->getJobManager());
-        $rsm->addRootEntityFromClassMetadata('JMSJobQueueBundle:Job', 'j');
+        $rsm->addRootEntityFromClassMetadata(Job::class, 'j');
 
         return $this->getJobManager()->createNativeQuery("SELECT j.* FROM jms_jobs j INNER JOIN jms_job_related_entities r ON r.job_id = j.id WHERE r.related_class = :relClass AND r.related_id = :relId", $rsm)
                     ->setParameter('relClass', $relClass)
@@ -143,12 +178,23 @@ class JobManager
                     ->getResult();
     }
 
-    public function findOpenJobForRelatedEntity($command, $relatedEntity)
+    /**
+     * @param $command
+     * @param $relatedEntity
+     * @return mixed
+     */
+    public function findOpenJobForRelatedEntity($command, $relatedEntity): mixed
     {
         return $this->findJobForRelatedEntity($command, $relatedEntity, array(Job::STATE_RUNNING, Job::STATE_PENDING, Job::STATE_NEW));
     }
 
-    public function findJobForRelatedEntity($command, $relatedEntity, array $states = array())
+    /**
+     * @param $command
+     * @param $relatedEntity
+     * @param array $states
+     * @return mixed
+     */
+    public function findJobForRelatedEntity($command, $relatedEntity, array $states = []): mixed
     {
         list($relClass, $relId) = $this->getRelatedEntityIdentifier($relatedEntity);
 
@@ -163,7 +209,7 @@ class JobManager
 
         if ( ! empty($states)) {
             $sql .= " AND j.state IN (:states)";
-            $params->add(new Parameter('states', $states, Connection::PARAM_STR_ARRAY));
+            $params->add(new Parameter('states', $states, ArrayParameterType::STRING));
         }
 
         return $this->getJobManager()->createNativeQuery($sql, $rsm)
@@ -171,58 +217,68 @@ class JobManager
                    ->getOneOrNullResult();
     }
 
-    private function getRelatedEntityIdentifier($entity)
+    /**
+     * @param $entity
+     * @return array
+     */
+    private function getRelatedEntityIdentifier($entity): array
     {
-        if ( ! is_object($entity)) {
-            throw new \RuntimeException('$entity must be an object.');
+        if (!is_object($entity)) {
+            throw new RuntimeException('$entity must be an object.');
         }
 
-        if ($entity instanceof \Doctrine\Common\Persistence\Proxy) {
+        if ($entity instanceof Proxy) {
             $entity->__load();
         }
 
         $relClass = ClassUtils::getClass($entity);
-        $relId = $this->registry->getManagerForClass($relClass)->getMetadataFactory()
+        $relId = $this->managerRegistry->getManagerForClass($relClass)->getMetadataFactory()
                     ->getMetadataFor($relClass)->getIdentifierValues($entity);
         asort($relId);
 
-        if ( ! $relId) {
-            throw new \InvalidArgumentException(sprintf('The identifier for entity of class "%s" was empty.', $relClass));
+        if (!$relId) {
+            throw new InvalidArgumentException(sprintf('The identifier for entity of class "%s" was empty.', $relClass));
         }
 
         return array($relClass, json_encode($relId));
     }
 
-    public function findPendingJob(array $excludedIds = array(), array $excludedQueues = array(), array $restrictedQueues = array())
+    /**
+     * @param array $excludedIds
+     * @param array $excludedQueues
+     * @param array $restrictedQueues
+     * @return mixed
+     */
+    public function findPendingJob(array $excludedIds = [], array $excludedQueues = [], array $restrictedQueues = []): mixed
     {
         $qb = $this->getJobManager()->createQueryBuilder();
         $qb->select('j')->from('JMSJobQueueBundle:Job', 'j')
             ->orderBy('j.priority', 'ASC')
             ->addOrderBy('j.id', 'ASC');
 
-        $conditions = array();
+        $conditions = [];
 
         $conditions[] = $qb->expr()->isNull('j.workerName');
 
         $conditions[] = $qb->expr()->lt('j.executeAfter', ':now');
-        $qb->setParameter(':now', new \DateTime(), 'datetime');
+        $qb->setParameter(':now', new DateTime(), 'datetime');
 
         $conditions[] = $qb->expr()->eq('j.state', ':state');
         $qb->setParameter('state', Job::STATE_PENDING);
 
-        if ( ! empty($excludedIds)) {
+        if (!empty($excludedIds)) {
             $conditions[] = $qb->expr()->notIn('j.id', ':excludedIds');
-            $qb->setParameter('excludedIds', $excludedIds, Connection::PARAM_INT_ARRAY);
+            $qb->setParameter('excludedIds', $excludedIds, ArrayParameterType::STRING);
         }
 
-        if ( ! empty($excludedQueues)) {
+        if (!empty($excludedQueues)) {
             $conditions[] = $qb->expr()->notIn('j.queue', ':excludedQueues');
-            $qb->setParameter('excludedQueues', $excludedQueues, Connection::PARAM_STR_ARRAY);
+            $qb->setParameter('excludedQueues', $excludedQueues, ArrayParameterType::STRING);
         }
 
-        if ( ! empty($restrictedQueues)) {
+        if (!empty($restrictedQueues)) {
             $conditions[] = $qb->expr()->in('j.queue', ':restrictedQueues');
-            $qb->setParameter('restrictedQueues', $restrictedQueues, Connection::PARAM_STR_ARRAY);
+            $qb->setParameter('restrictedQueues', $restrictedQueues, ArrayParameterType::STRING);
         }
 
         $qb->where(call_user_func_array(array($qb->expr(), 'andX'), $conditions));
@@ -230,7 +286,16 @@ class JobManager
         return $qb->getQuery()->setMaxResults(1)->getOneOrNullResult();
     }
 
-    public function closeJob(Job $job, $finalState)
+    /**
+     * @param Job $job
+     * @param $finalState
+     * @return void
+     * @throws Exception
+     * @throws ORMException
+     * @throws OptimisticLockException
+     * @throws \Exception
+     */
+    public function closeJob(Job $job, $finalState): void
     {
         $this->getJobManager()->getConnection()->beginTransaction();
         try {
@@ -256,7 +321,15 @@ class JobManager
         }
     }
 
-    private function closeJobInternal(Job $job, $finalState, array &$visited = array())
+    /**
+     * @param Job $job
+     * @param $finalState
+     * @param array $visited
+     * @return void
+     * @throws ORMException
+     * @throws Exception
+     */
+    private function closeJobInternal(Job $job, $finalState, array &$visited = []): void
     {
         if (in_array($job, $visited, true)) {
             return;
@@ -267,9 +340,9 @@ class JobManager
             return;
         }
 
-        if (null !== $this->dispatcher && ($job->isRetryJob() || 0 === count($job->getRetryJobs()))) {
+        if (null !== $this->eventDispatcher && ($job->isRetryJob() || 0 === count($job->getRetryJobs()))) {
             $event = new StateChangeEvent($job, $finalState);
-            $this->dispatcher->dispatch($event, 'jms_job_queue.job_state_change');
+            $this->eventDispatcher->dispatch($event, 'jms_job_queue.job_state_change');
             $finalState = $event->getNewState();
         }
 
@@ -346,14 +419,15 @@ class JobManager
                 return;
 
             default:
-                throw new \LogicException(sprintf('Non allowed state "%s" in closeJobInternal().', $finalState));
+                throw new LogicException(sprintf('Non allowed state "%s" in closeJobInternal().', $finalState));
         }
     }
 
     /**
      * @return Job[]
+     * @throws Exception
      */
-    public function findIncomingDependencies(Job $job)
+    public function findIncomingDependencies(Job $job): array
     {
         $jobIds = $this->getJobIdsOfIncomingDependencies($job);
         if (empty($jobIds)) {
@@ -367,8 +441,9 @@ class JobManager
 
     /**
      * @return Job[]
+     * @throws Exception
      */
-    public function getIncomingDependencies(Job $job)
+    public function getIncomingDependencies(Job $job): array
     {
         $jobIds = $this->getJobIdsOfIncomingDependencies($job);
         if (empty($jobIds)) {
@@ -380,16 +455,23 @@ class JobManager
                     ->getResult();
     }
 
-    private function getJobIdsOfIncomingDependencies(Job $job)
+    /**
+     * @param Job $job
+     * @return mixed
+     * @throws Exception
+     */
+    private function getJobIdsOfIncomingDependencies(Job $job): mixed
     {
-        $jobIds = $this->getJobManager()->getConnection()
-            ->executeQuery("SELECT source_job_id FROM jms_job_dependencies WHERE dest_job_id = :id", array('id' => $job->getId()))
-            ->fetchAll(\PDO::FETCH_COLUMN);
-
-        return $jobIds;
+        return $this->getJobManager()->getConnection()
+            ->executeQuery("SELECT source_job_id FROM jms_job_dependencies WHERE dest_job_id = :id", ['id' => $job->getId()])
+            ->fetchFirstColumn();
     }
 
-    public function findLastJobsWithError($nbJobs = 10)
+    /**
+     * @param int $nbJobs
+     * @return mixed
+     */
+    public function findLastJobsWithError(int $nbJobs = 10): mixed
     {
         return $this->getJobManager()->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.state IN (:errorStates) AND j.originalJob IS NULL ORDER BY j.closedAt DESC")
                     ->setParameter('errorStates', array(Job::STATE_TERMINATED, Job::STATE_FAILED))
@@ -397,7 +479,10 @@ class JobManager
                     ->getResult();
     }
 
-    public function getAvailableQueueList()
+    /**
+     * @return array
+     */
+    public function getAvailableQueueList(): array
     {
         $queues =  $this->getJobManager()->createQuery("SELECT DISTINCT j.queue FROM JMSJobQueueBundle:Job j WHERE j.state IN (:availableStates)  GROUP BY j.queue")
             ->setParameter('availableStates', array(Job::STATE_RUNNING, Job::STATE_NEW, Job::STATE_PENDING))
@@ -413,8 +498,11 @@ class JobManager
         return $newQueueArray;
     }
 
-
-    public function getAvailableJobsForQueueCount($jobQueue)
+    /**
+     * @param $jobQueue
+     * @return int
+     */
+    public function getAvailableJobsForQueueCount($jobQueue): int
     {
         $result = $this->getJobManager()->createQuery("SELECT j.queue FROM JMSJobQueueBundle:Job j WHERE j.state IN (:availableStates) AND j.queue = :queue")
             ->setParameter('availableStates', array(Job::STATE_RUNNING, Job::STATE_NEW, Job::STATE_PENDING))
@@ -424,9 +512,12 @@ class JobManager
 
         return count($result);
     }
-    
-    private function getJobManager(): EntityManager
+
+    /**
+     * @return ObjectManager
+     */
+    private function getJobManager(): ObjectManager
     {
-        return $this->registry->getManagerForClass(Job::class);
+        return $this->managerRegistry->getManagerForClass(Job::class);
     }
 }

@@ -16,11 +16,13 @@
  * limitations under the License.
  */
 
-namespace JMS\JobQueueBundle\Tests\Entity;
+namespace Tests\Entity;
 
-use JMS\JobQueueBundle\Entity\Job;
-use JMS\JobQueueBundle\Exception\InvalidStateTransitionException;
+use Entity\Job;
+use Exception\InvalidStateTransitionException;
+use LogicException;
 use PHPUnit\Framework\TestCase;
+use ReflectionException;
 
 class JobTest extends TestCase
 {
@@ -148,7 +150,7 @@ class JobTest extends TestCase
 
     public function testAddDependencyToRunningJob()
     {
-        $this->expectException(\LogicException::class);
+        $this->expectException(LogicException::class);
         $this->expectExceptionMessage('You cannot add dependencies to a job which might have been started already.');
 
         $job = new Job('a');
@@ -245,7 +247,14 @@ class JobTest extends TestCase
         $this->assertEquals('foo', $clonedJob->getQueue());
     }
 
-    private function setField($obj, $field, $value)
+    /**
+     * @param $obj
+     * @param $field
+     * @param $value
+     * @return void
+     * @throws ReflectionException
+     */
+    private function setField($obj, $field, $value): void
     {
         $ref = new \ReflectionProperty($obj, $field);
         $ref->setAccessible(true);

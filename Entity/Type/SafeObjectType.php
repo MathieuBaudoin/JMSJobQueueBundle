@@ -1,17 +1,18 @@
 <?php
 
-namespace JMS\JobQueueBundle\Entity\Type;
+namespace Entity\Type;
 
-use Doctrine\DBAL\Types\ObjectType;
+use Doctrine\DBAL\Platforms\AbstractPlatform;
+use Doctrine\DBAL\Types\JsonType;
 
-class SafeObjectType extends ObjectType
+class SafeObjectType extends JsonType
 {
-    public function getSQLDeclaration(array $fieldDeclaration, \Doctrine\DBAL\Platforms\AbstractPlatform $platform)
+    public function getSQLDeclaration(array $column, AbstractPlatform $platform): string
     {
-        return $platform->getBlobTypeDeclarationSQL($fieldDeclaration);
+        return $platform->getBlobTypeDeclarationSQL($column);
     }
 
-    public function getName()
+    public function getName(): string
     {
         return 'jms_job_safe_object';
     }

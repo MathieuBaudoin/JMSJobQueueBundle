@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-namespace JMS\JobQueueBundle\Exception;
+namespace Exception;
 
 /**
  * UnexpectedValueException for the JobQueueBundle.

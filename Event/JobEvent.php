@@ -16,21 +16,16 @@
  * limitations under the License.
  */
 
-namespace JMS\JobQueueBundle\Event;
+namespace Event;
 
-use JMS\JobQueueBundle\Entity\Job;
+use Entity\Job;
 use Symfony\Contracts\EventDispatcher\Event;
 
 abstract class JobEvent extends Event
 {
-    private $job;
+    public function __construct(private Job $job) {}
 
-    public function __construct(Job $job)
-    {
-        $this->job = $job;
-    }
-
-    public function getJob()
+    public function getJob(): Job
     {
         return $this->job;
     }

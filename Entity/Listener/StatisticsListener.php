@@ -1,12 +1,18 @@
 <?php
 
-namespace JMS\JobQueueBundle\Entity\Listener;
+namespace Entity\Listener;
 
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
+use Doctrine\Persistence\Mapping\MappingException;
 
 class StatisticsListener
 {
-    public function postGenerateSchema(GenerateSchemaEventArgs $event)
+    /**
+     * @param GenerateSchemaEventArgs $event
+     * @return void
+     * @throws MappingException
+     */
+    public function postGenerateSchema(GenerateSchemaEventArgs $event): void
     {
         $schema = $event->getSchema();
 

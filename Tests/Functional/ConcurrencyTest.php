@@ -3,7 +3,7 @@
 namespace JMS\JobQueueBundle\Tests\Functional;
 
 use Doctrine\ORM\EntityManager;
-use JMS\JobQueueBundle\Entity\Job;
+use Entity\Job;
 use Symfony\Component\Process\Process;
 
 class ConcurrencyTest extends BaseTestCase

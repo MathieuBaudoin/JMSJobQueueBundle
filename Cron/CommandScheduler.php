@@ -3,12 +3,12 @@
 namespace JMS\JobQueueBundle\Cron;
 
 use JMS\JobQueueBundle\Console\CronCommand;
-use JMS\JobQueueBundle\Entity\Job;
+use Entity\Job;
 
 class CommandScheduler implements JobScheduler
 {
-    private $name;
-    private $command;
+    private string $name;
+    private CronCommand $command;
 
     public function __construct(string $name, CronCommand $command)
     {

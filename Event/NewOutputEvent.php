@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-namespace JMS\JobQueueBundle\Event;
+namespace Event;
 
-use JMS\JobQueueBundle\Entity\Job;
-use JMS\JobQueueBundle\Event\JobEvent;
+use Entity\Job;
 
 class NewOutputEvent extends JobEvent
 {
@@ -41,7 +40,7 @@ class NewOutputEvent extends JobEvent
         return $this->newOutput;
     }
 
-    public function setNewOutput($output)
+    public function setNewOutput($output): void
     {
         $this->newOutput = $output;
     }

@@ -3,31 +3,35 @@
 namespace JMS\JobQueueBundle\Controller;
 
 use Doctrine\Common\Util\ClassUtils;
-use Doctrine\ORM\EntityManager;
 use Doctrine\Persistence\ManagerRegistry;
-use JMS\JobQueueBundle\Entity\Job;
-use JMS\JobQueueBundle\Entity\Repository\JobManager;
-use JMS\JobQueueBundle\View\JobFilter;
+use Doctrine\Persistence\ObjectManager;
+use Entity\Job;
+use Entity\Repository\JobManager;
+use View\JobFilter;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Routing\RouterInterface;
-use Symfony\Contracts\Service\ServiceSubscriberInterface;
 use Twig\Environment;
+use Twig\Error\LoaderError;
+use Twig\Error\RuntimeError;
+use Twig\Error\SyntaxError;
 
 class JobController
 {
-    public function __construct(private JobManager $jobManager,
-                                private ManagerRegistry $managerRegistry, 
-                                private Environment $twig,
-                                private RouterInterface $router,
-                                private bool $enableStats)
-    {
-    }
+    public function __construct(private readonly JobManager $jobManager, private readonly ManagerRegistry $managerRegistry,
+                                private readonly Environment $twig, private readonly RouterInterface $router,
+                                private readonly bool $enableStats) {}
 
-    public function overviewAction(Request $request)
+    /**
+     * @param Request $request
+     * @return Response
+     * @throws LoaderError
+     * @throws RuntimeError
+     * @throws SyntaxError
+     */
+    public function overviewAction(Request $request): Response
     {
         $jobFilter = JobFilter::fromRequest($request);
 
@@ -42,7 +46,7 @@ class JobController
             $qb->setParameter($i, $job->getId());
         }
 
-        if ( ! empty($jobFilter->command)) {
+        if (!empty($jobFilter->command)) {
             $qb->andWhere($qb->expr()->orX(
                 $qb->expr()->like('j.command', ':commandQuery'),
                 $qb->expr()->like('j.args', ':commandQuery')
@@ -50,7 +54,7 @@ class JobController
                 ->setParameter('commandQuery', '%'.$jobFilter->command.'%');
         }
 
-        if ( ! empty($jobFilter->state)) {
+        if (!empty($jobFilter->state)) {
             $qb->andWhere($qb->expr()->eq('j.state', ':jobState'))
                 ->setParameter('jobState', $jobFilter->state);
         }
@@ -72,7 +76,14 @@ class JobController
         )));
     }
 
-    public function detailsAction(Job $job)
+    /**
+     * @param Job $job
+     * @return Response
+     * @throws LoaderError
+     * @throws RuntimeError
+     * @throws SyntaxError
+     */
+    public function detailsAction(Job $job): Response
     {
         $relatedEntities = array();
         foreach ($job->getRelatedEntities() as $entity) {
@@ -102,15 +113,13 @@ class JobController
                 $scaleFactor = $endTime - $startTime > 300 ? 1/60 : 1;
 
                 // This assumes that we have the same number of rows for each characteristic.
-                for ($i=0,$c=count(reset($dataPerCharacteristic)); $i<$c; $i++) {
+                for ($i = 0,$c = count(reset($dataPerCharacteristic)); $i < $c; $i++) {
                     $row = array((strtotime($dataPerCharacteristic[$chars[0]][$i][0]) - $startTime) * $scaleFactor);
                     foreach ($chars as $name) {
                         $value = (float) $dataPerCharacteristic[$name][$i][1];
 
-                        switch ($name) {
-                            case 'memory':
-                                $value /= 1024 * 1024;
-                                break;
+                        if ($name == 'memory') {
+                            $value /= 1024 * 1024;
                         }
 
                         $row[] = $value;
@@ -121,16 +130,20 @@ class JobController
             }
         }
 
-        return new Response($this->twig->render('@JMSJobQueue/Job/details.html.twig', array(
+        return new Response($this->twig->render('@JMSJobQueue/Job/details.html.twig', [
             'job' => $job,
             'relatedEntities' => $relatedEntities,
             'incomingDependencies' => $this->jobManager->getIncomingDependencies($job),
             'statisticData' => $statisticData,
-            'statisticOptions' => $statisticOptions,
-        )));
+            'statisticOptions' => $statisticOptions
+        ]));
     }
 
-    public function retryJobAction(Job $job)
+    /**
+     * @param Job $job
+     * @return RedirectResponse
+     */
+    public function retryJobAction(Job $job): RedirectResponse
     {
         $state = $job->getState();
 
@@ -152,7 +165,7 @@ class JobController
         return new RedirectResponse($url, 201);
     }
 
-    private function getEm(): EntityManager
+    private function getEm(): ObjectManager
     {
         return $this->managerRegistry->getManagerForClass(Job::class);
     }

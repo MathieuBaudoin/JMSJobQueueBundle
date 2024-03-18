@@ -7,6 +7,8 @@ declare(ticks = 10000000);
 use Doctrine\DBAL\Statement;
 use Doctrine\DBAL\Types\Type;
 
+use Exception;
+use PDO;
 use Symfony\Bundle\FrameworkBundle\Console\Application as BaseApplication;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -21,9 +23,12 @@ use Symfony\Component\HttpKernel\KernelInterface;
  */
 class Application extends BaseApplication
 {
-    private $insertStatStmt;
-    private $input;
+    private string $insertStatStmt;
+    private InputInterface $input;
 
+    /**
+     * @param KernelInterface $kernel
+     */
     public function __construct(KernelInterface $kernel)
     {
         parent::__construct($kernel);
@@ -37,7 +42,13 @@ class Application extends BaseApplication
         }
     }
 
-    public function doRun(InputInterface $input, OutputInterface $output)
+    /**
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return int
+     * @throws Exception
+     */
+    public function doRun(InputInterface $input, OutputInterface $output): int
     {
         $this->input = $input;
 
@@ -46,16 +57,20 @@ class Application extends BaseApplication
             $this->saveDebugInformation();
 
             return $rs;
-        } catch (\Exception $ex) {
+        } catch (Exception $ex) {
             $this->saveDebugInformation($ex);
 
             throw $ex;
         }
     }
 
-    public function onTick()
+    /**
+     * @return void
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function onTick(): void
     {
-        if ( ! $this->input->hasOption('jms-job-id') || null === $jobId = $this->input->getOption('jms-job-id')) {
+        if (!$this->input->hasOption('jms-job-id') || null === $jobId = $this->input->getOption('jms-job-id')) {
             return;
         }
 
@@ -67,7 +82,7 @@ class Application extends BaseApplication
             $this->insertStatStmt = $this->getConnection()->prepare($this->insertStatStmt);
         }
 
-        $this->insertStatStmt->bindValue('jobId', $jobId, \PDO::PARAM_INT);
+        $this->insertStatStmt->bindValue('jobId', $jobId, PDO::PARAM_INT);
         $this->insertStatStmt->bindValue('createdAt', new \DateTime(), Type::getType('datetime'));
 
         foreach ($characteristics as $name => $value) {
@@ -77,7 +92,7 @@ class Application extends BaseApplication
         }
     }
 
-    private function saveDebugInformation(\Exception $ex = null)
+    private function saveDebugInformation(Exception $ex = null): void
     {
         if ( ! $this->input->hasOption('jms-job-id') || null === $jobId = $this->input->getOption('jms-job-id')) {
             return;
@@ -92,10 +107,10 @@ class Application extends BaseApplication
                 'trace' => serialize($ex ? FlattenException::create($ex) : null),
             ),
             array(
-                'id' => \PDO::PARAM_INT,
-                'memoryUsage' => \PDO::PARAM_INT,
-                'memoryUsageReal' => \PDO::PARAM_INT,
-                'trace' => \PDO::PARAM_LOB,
+                'id' => PDO::PARAM_INT,
+                'memoryUsage' => PDO::PARAM_INT,
+                'memoryUsageReal' => PDO::PARAM_INT,
+                'trace' => PDO::PARAM_LOB,
             )
         );
     }

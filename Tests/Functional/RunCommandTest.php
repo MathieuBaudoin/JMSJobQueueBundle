@@ -2,7 +2,7 @@
 
 namespace JMS\JobQueueBundle\Tests\Functional;
 
-use JMS\JobQueueBundle\Entity\Job;
+use Entity\Job;
 use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Bundle\FrameworkBundle\Console\Application;

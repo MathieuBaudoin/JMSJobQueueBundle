@@ -4,19 +4,20 @@ declare(strict_types = 1);
 
 namespace JMS\JobQueueBundle\Console;
 
-use JMS\JobQueueBundle\Entity\Job;
+use DateTime;
+use Entity\Job;
 use Symfony\Component\Console\Command\Command;
 
 trait ScheduleInSecondInterval
 {
-    public function shouldBeScheduled(\DateTime $lastRunAt): bool
+    public function shouldBeScheduled(DateTime $lastRunAt): bool
     {
         return time() - $lastRunAt->getTimestamp() >= $this->getScheduleInterval();
     }
 
-    public function createCronJob(\DateTime $_): Job
+    public function createCronJob(DateTime $_): Job
     {
-        if ( ! $this instanceof Command) {
+        if (!$this instanceof Command) {
             throw new \LogicException('This trait must be used in Symfony console commands only.');
         }
 

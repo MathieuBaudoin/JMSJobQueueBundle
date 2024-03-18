@@ -1,37 +1,48 @@
 <?php
 
-namespace JMS\JobQueueBundle\Entity;
+namespace Entity;
 
-use Doctrine\ORM\Mapping as ORM;
+use DateTime;
+use Doctrine\ORM\Mapping\ChangeTrackingPolicy;
+use Doctrine\ORM\Mapping\Column;
+use Doctrine\ORM\Mapping\Entity;
+use Doctrine\ORM\Mapping\GeneratedValue;
+use Doctrine\ORM\Mapping\Id;
+use Doctrine\ORM\Mapping\Table;
 
-/**
- * @ORM\Entity
- * @ORM\Table(name = "jms_cron_jobs")
- * @ORM\ChangeTrackingPolicy("DEFERRED_EXPLICIT")
- */
+#[Entity]
+#[Table(name: "jms_cron_jobs")]
+#[ChangeTrackingPolicy("DEFERRED_EXPLICIT")]
 class CronJob
 {
-    /** @ORM\Id @ORM\Column(type = "integer", options = {"unsigned": true}) @ORM\GeneratedValue(strategy="AUTO") */
-    private $id;
+    #[Id]
+    #[Column(type: "integer", options: ["unsigned" => true])]
+    #[GeneratedValue(strategy: "AUTO")]
+    private int $id;
 
-    /** @ORM\Column(type = "string", length = 200, unique = true) */
-    private $command;
+    #[Column(type: "string", length: 200, unique: true)]
+    private string $command;
 
-    /** @ORM\Column(type = "datetime", name = "lastRunAt") */
-    private $lastRunAt;
+    #[Column(name: "lastRunAt", type: "datetime")]
+    private DateTime $lastRunAt;
 
     public function __construct($command)
     {
         $this->command = $command;
-        $this->lastRunAt = new \DateTime();
+        $this->lastRunAt = new DateTime();
     }
 
-    public function getCommand()
+    public function getId(): int
+    {
+        return $this->id;
+    }
+
+    public function getCommand(): string
     {
         return $this->command;
     }
 
-    public function getLastRunAt()
+    public function getLastRunAt(): DateTime
     {
         return $this->lastRunAt;
     }

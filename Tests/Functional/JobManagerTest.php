@@ -2,8 +2,8 @@
 
 namespace JMS\JobQueueBundle\Tests\Functional;
 
-use JMS\JobQueueBundle\Retry\ExponentialRetryScheduler;
-use JMS\JobQueueBundle\Retry\RetryScheduler;
+use Retry\ExponentialRetryScheduler;
+use Retry\RetryScheduler;
 use JMS\JobQueueBundle\Tests\Functional\TestBundle\Entity\Train;
 
 use JMS\JobQueueBundle\Tests\Functional\TestBundle\Entity\Wagon;
@@ -11,9 +11,9 @@ use JMS\JobQueueBundle\Tests\Functional\TestBundle\Entity\Wagon;
 use PHPUnit\Framework\Constraint\LogicalNot;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Doctrine\ORM\EntityManager;
-use JMS\JobQueueBundle\Entity\Repository\JobManager;
-use JMS\JobQueueBundle\Event\StateChangeEvent;
-use JMS\JobQueueBundle\Entity\Job;
+use Entity\Repository\JobManager;
+use Event\StateChangeEvent;
+use Entity\Job;
 
 class JobManagerTest extends BaseTestCase
 {

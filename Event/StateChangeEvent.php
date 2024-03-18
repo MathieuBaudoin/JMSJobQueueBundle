@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-namespace JMS\JobQueueBundle\Event;
+namespace Event;
 
-use JMS\JobQueueBundle\Entity\Job;
-use JMS\JobQueueBundle\Event\JobEvent;
+use Entity\Job;
+use Event\JobEvent;
 
 class StateChangeEvent extends JobEvent
 {
@@ -37,12 +37,12 @@ class StateChangeEvent extends JobEvent
         return $this->newState;
     }
 
-    public function setNewState($state)
+    public function setNewState($state): void
     {
         $this->newState = $state;
     }
 
-    public function getOldState()
+    public function getOldState(): string
     {
         return $this->getJob()->getState();
     }

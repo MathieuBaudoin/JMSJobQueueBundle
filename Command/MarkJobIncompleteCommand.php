@@ -4,9 +4,9 @@ namespace JMS\JobQueueBundle\Command;
 
 use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\ORM\EntityManager;
-use JMS\JobQueueBundle\Entity\Job;
+use Entity\Job;
 use Symfony\Component\Console\Command\Command;
-use JMS\JobQueueBundle\Entity\Repository\JobManager;
+use Entity\Repository\JobManager;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputArgument;

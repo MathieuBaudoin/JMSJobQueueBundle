@@ -19,11 +19,11 @@
 namespace JMS\JobQueueBundle\Command;
 
 use Doctrine\ORM\EntityManager;
-use JMS\JobQueueBundle\Entity\Job;
-use JMS\JobQueueBundle\Entity\Repository\JobManager;
-use JMS\JobQueueBundle\Event\NewOutputEvent;
-use JMS\JobQueueBundle\Event\StateChangeEvent;
-use JMS\JobQueueBundle\Exception\InvalidArgumentException;
+use Entity\Job;
+use Entity\Repository\JobManager;
+use Event\NewOutputEvent;
+use Event\StateChangeEvent;
+use Exception\InvalidArgumentException;
 use Symfony\Bridge\Doctrine\ManagerRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
