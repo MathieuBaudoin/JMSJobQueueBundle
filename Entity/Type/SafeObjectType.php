@@ -1,6 +1,6 @@
 <?php
 
-namespace Entity\Type;
+namespace JMS\JobQueueBundle\Entity\Type;
 
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Types\JsonType;
