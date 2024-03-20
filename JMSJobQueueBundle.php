@@ -16,8 +16,6 @@
  * limitations under the License.
  */
 
-namespace JMS\JobQueueBundle;
-
 use JMS\JobQueueBundle\DependencyInjection\CompilerPass\LinkGeneratorsPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
@@ -27,5 +25,10 @@ class JMSJobQueueBundle extends Bundle
     public function build(ContainerBuilder $container): void
     {
         $container->addCompilerPass(new LinkGeneratorsPass());
+    }
+
+    public function getPath(): string
+    {
+        return dirname(__DIR__);
     }
 }
