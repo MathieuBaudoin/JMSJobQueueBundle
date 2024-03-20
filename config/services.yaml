@@ -1,0 +1,19 @@
+parameters:
+  jms_job_queue.entity.job_listener: src\EntityListener\JobListener
+  jms_job_queue.twig.extension: src\Twig\Extension\JobQueueExtension
+  jms_job_queue.retry_scheduler: src\Retry\ExponentialRetryScheduler
+  jms_job_queue.job_manager: src\Repository\JobRepository
+  jms_job_queue.job_controller: src\Controller\JobController
+
+services:
+  # default configuration for services in *this* file
+  _defaults:
+    autowire: true      # Automatically injects dependencies in your services.
+    autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+
+  JMS\JobQueueBundle\:
+    resource: '../src/'
+    exclude:
+      - '../src/DependencyInjection/'
+      - '../src/Entity/'
+      - '../src/Kernel.php'
